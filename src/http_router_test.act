@@ -1,5 +1,5 @@
 import http
-import http_router
+import lib as http_router
 import logging
 import testing
 
