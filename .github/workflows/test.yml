@@ -11,9 +11,9 @@ jobs:
         with:
           channel: 'tip'
       - name: "Check out repository code"
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: "Cache acton stuff"
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/acton
