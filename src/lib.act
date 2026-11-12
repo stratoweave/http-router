@@ -177,14 +177,14 @@ def _match_pattern(segments: list[str], path_segments: list[str]) -> ?dict[str, 
     return params
 
 
-def _default_not_found_handler(ctx: Context, respond: proc(int, dict[str, str], str) -> None):
+def _default_not_found_handler(ctx: Context, respond: action(int, dict[str, str], str) -> None):
     respond(404, {}, "")
 
 
 def _apply_middleware(
-    terminal_handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None,
-    middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
-) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None:
+    terminal_handler: proc(Context, action(int, dict[str, str], str) -> None) -> None,
+    middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
+) -> proc(Context, action(int, dict[str, str], str) -> None) -> None:
     idx = len(middlewares) - 1
     downstream_handler = terminal_handler
     while idx >= 0:
@@ -231,17 +231,17 @@ class _Route(object):
     method: str
     segments: list[str]
     score: int
-    middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
+    middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
     @property
-    handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None
+    handler: proc(Context, action(int, dict[str, str], str) -> None) -> None
 
     def __init__(
         self,
         method: str,
         segments: list[str],
         score: int,
-        middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None],
-        handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None
+        middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None],
+        handler: proc(Context, action(int, dict[str, str], str) -> None) -> None
     ):
         self.method = method
         self.segments = segments
@@ -252,30 +252,30 @@ class _Route(object):
 
 class RouteRegistrar(object):
     """Shared registration surface for HTTP verb helpers."""
-    handle : proc(str, str, proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> None
+    handle : proc(str, str, proc(Context, action(int, dict[str, str], str) -> None) -> None) -> None
 
-    def get(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def get(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("GET", pattern, handler)
 
-    def post(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def post(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("POST", pattern, handler)
 
-    def put(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def put(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("PUT", pattern, handler)
 
-    def patch(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def patch(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("PATCH", pattern, handler)
 
-    def delete(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def delete(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("DELETE", pattern, handler)
 
-    def options(self, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def options(self, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.handle("OPTIONS", pattern, handler)
 
 
 class RouteGroup(RouteRegistrar):
     """Scoped registration interface used inside Router.route(...)."""
-    use : proc(proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> None
+    use : proc(proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None) -> None
     route : proc(str, proc(RouteGroup) -> None) -> None
 
 
@@ -288,22 +288,22 @@ class _ScopedGroup(RouteGroup):
     """
     router: Router
     prefix: str
-    middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
+    middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
 
     def __init__(
         self,
         router: Router,
         prefix: str,
-        middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
+        middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
     ):
         self.router = router
         self.prefix = prefix
         self.middlewares = middlewares
 
-    def use(self, middleware: proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def use(self, middleware: proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.middlewares.append(middleware)
 
-    def handle(self, method: str, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def handle(self, method: str, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         # Freeze the current scoped middleware stack for this route so later
         # g.use(...) calls do not retroactively change already-registered routes.
         self.router._add_route(method, _join_paths(self.prefix, pattern), handler, self.middlewares + [])
@@ -317,24 +317,24 @@ class _ScopedGroup(RouteGroup):
 class Router(RouteRegistrar):
     """Small score-based HTTP router with global middleware and scoped route groups."""
     routes: list[_Route]
-    middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
+    middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
     @property
-    not_found_handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None
+    not_found_handler: proc(Context, action(int, dict[str, str], str) -> None) -> None
 
     def __init__(self):
         self.routes = []
         self.middlewares = []
         self.not_found_handler = _default_not_found_handler
 
-    def use(self, middleware: proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def use(self, middleware: proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.middlewares.append(middleware)
 
     def _add_route(
         self,
         method: str,
         pattern: str,
-        handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None,
-        route_middlewares: list[proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None]
+        handler: proc(Context, action(int, dict[str, str], str) -> None) -> None,
+        route_middlewares: list[proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None]
     ):
         method_norm = method.upper().strip()
         pattern_norm, segments, score = _compile_pattern(pattern)
@@ -345,13 +345,13 @@ class Router(RouteRegistrar):
 
         self.routes.append(_Route(method_norm, segments, score, route_middlewares, handler))
 
-    def handle(self, method: str, pattern: str, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def handle(self, method: str, pattern: str, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self._add_route(method, pattern, handler, [])
 
     def route(self, prefix: str, build: proc(RouteGroup) -> None):
         build(_ScopedGroup(self, _normalize_path(prefix), []))
 
-    def not_found(self, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
+    def not_found(self, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
         self.not_found_handler = handler
 
     def _select_route(
@@ -392,13 +392,13 @@ class Router(RouteRegistrar):
             )
         return None
 
-    def _dispatch(self, handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None, ctx: Context, respond: proc(int, dict[str, str], str) -> None):
+    def _dispatch(self, handler: proc(Context, action(int, dict[str, str], str) -> None) -> None, ctx: Context, respond: action(int, dict[str, str], str) -> None):
         try:
             handler(ctx, respond)
         except Exception:
             respond(500, {}, "")
 
-    def serve(self, request: http.Request, respond: proc(int, dict[str, str], str) -> None):
+    def serve(self, request: http.Request, respond: action(int, dict[str, str], str) -> None):
         request_path = request.path
         req_method = request.method
         method = req_method.upper().strip() if isinstance(req_method, str) else ""
@@ -428,10 +428,10 @@ class Router(RouteRegistrar):
         self._dispatch(wrapped_fallback, ctx, respond)
 
 
-def recoverer_middleware(log: ?logging.Logger = None) -> proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None:
+def recoverer_middleware(log: ?logging.Logger = None) -> proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None:
     """Catch unexpected exceptions and return 500 unless already responded."""
-    def middleware(next_handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
-        def wrapped(ctx: Context, respond: proc(int, dict[str, str], str) -> None):
+    def middleware(next_handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
+        def wrapped(ctx: Context, respond: action(int, dict[str, str], str) -> None):
             try:
                 next_handler(ctx, respond)
             except Exception as e:
@@ -441,18 +441,26 @@ def recoverer_middleware(log: ?logging.Logger = None) -> proc(proc(Context, proc
     return middleware
 
 
-def access_log_middleware(log: logging.Logger) -> proc(proc(Context, proc(int, dict[str, str], str) -> None) -> None) -> proc(Context, proc(int, dict[str, str], str) -> None) -> None:
+actor _LoggedResponse(
+    log: logging.Logger,
+    method: str,
+    path: str,
+    stopwatch: time.Stopwatch,
+    respond: action(int, dict[str, str], str) -> None
+):
+    def send(status: int, headers: dict[str, str], body: str):
+        log.info("HTTP response", {"method": method, "path": path, "status": status, "latency_ms": stopwatch.elapsed().to_float() * 1000.0})
+        respond(status, headers, body)
+
+
+def access_log_middleware(log: logging.Logger) -> proc(proc(Context, action(int, dict[str, str], str) -> None) -> None) -> proc(Context, action(int, dict[str, str], str) -> None) -> None:
     """Log request method/path plus response status/latency when written."""
-    def middleware(next_handler: proc(Context, proc(int, dict[str, str], str) -> None) -> None):
-        def wrapped(ctx: Context, respond: proc(int, dict[str, str], str) -> None):
+    def middleware(next_handler: proc(Context, action(int, dict[str, str], str) -> None) -> None):
+        def wrapped(ctx: Context, respond: action(int, dict[str, str], str) -> None):
             req_method = ctx.request.method
             method = req_method if isinstance(req_method, str) else "UNKNOWN"
             stopwatch = time.Stopwatch()
-
-            def wrapped_respond(status: int, headers: dict[str, str], body: str):
-                log.info("HTTP response", {"method": method, "path": ctx.path, "status": status, "latency_ms": stopwatch.elapsed().to_float() * 1000.0})
-                respond(status, headers, body)
-
-            next_handler(ctx, wrapped_respond)
+            response = _LoggedResponse(log, method, ctx.path, stopwatch, respond)
+            next_handler(ctx, response.send)
         return wrapped
     return middleware
