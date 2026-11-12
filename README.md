@@ -186,8 +186,8 @@ Scoped middleware is captured when a route or child group is registered. A later
 Useful helpers:
 
 - `ctx.param(name, default="")`
-- `ctx.query_param(name, default="")`
-- `ctx.query()`
+- `ctx.query_param(name, default="")`, the first value of a query param
+- `ctx.query()`, every value of each query param by name, in request order
 - `ctx.set(key, value)`
 - `ctx.get(key)`
 

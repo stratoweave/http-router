@@ -126,6 +126,24 @@ actor _test_query_param_helper(t: testing.EnvT):
         t.failure(e)
 
 
+actor _test_query_param_percent_decoding(t: testing.EnvT):
+    r = http_router.Router()
+
+    def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], str) -> None):
+        respond(200, {"Content-Type": "text/plain"}, ctx.query_param("q", "<missing>"))
+
+    r.get("/search", query_handler)
+
+    def bad_escape():
+        # ValueError: Invalid percent escape: %z
+        _serve_and_assert(t, r, _request("GET", "/search?q=%zz"), 400, "")
+
+    try:
+        _serve_and_assert(t, r, _request("GET", "/search?q=a%2Fb"), 200, "a/b", bad_escape)
+    except Exception as e:
+        t.failure(e)
+
+
 actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
     r = http_router.Router()
 

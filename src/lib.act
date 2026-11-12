@@ -1,23 +1,17 @@
 import http
 import logging
+import testing
 import time
 import uri
 
 
-def _extract_path(path: str) -> str:
-    parsed_path, remainder = uri.parse_path(path)
-    if isinstance(parsed_path, str) and parsed_path != "":
-        return parsed_path
-    return "/"
-
-
 def _normalize_path(path: str) -> str:
-    p = _extract_path(path)
-    if "\\" in p:
+    """Normalize a URI path, which must not include a query or fragment."""
+    if "\\" in path:
         raise ValueError("Backslash not allowed in URI path")
 
     parts: list[str] = []
-    for part in p.split("/"):
+    for part in path.split("/"):
         if part in {"", "."}:
             continue
         if part == "..":
@@ -45,23 +39,40 @@ def _join_paths(left: str, right: str) -> str:
     return left_norm + right_norm
 
 
-def _parse_query_params(path: str) -> dict[str, str]:
-    query_params: dict[str, str] = {}
-    path_component, remainder = uri.parse_path(path)
-    query_string, fragment_remainder = uri.parse_query(remainder)
-    query_text: str = query_string if isinstance(query_string, str) else ""
-    if query_text == "":
+def _parse_query_params(query: ?str) -> dict[str, list[str]]:
+    """Decode %-escaped query param names and values after splitting
+
+    All values for a name that may appear multiple times are collected in the
+    list. Raises ValueError on an invalid escape.
+    """
+    query_params = {}
+    if query is None:
         return query_params
 
-    for param in query_text.split("&"):
+    for param in query!.split("&"):
         if param == "":
             continue
-        if "=" in param:
-            kv = param.split("=", 1)
-            query_params[kv[0]] = kv[1]
-        else:
-            query_params[param] = ""
+        kv = param.split("=", 1)
+        name = uri.unquote(kv[0])
+        value = uri.unquote(kv[1]) if len(kv) == 2 else ""
+        if name not in query_params:
+            query_params[name] = []
+        query_params[name].append(value)
     return query_params
+
+
+def _test_query_params_decoded_after_split():
+    # The escaped "&" and "=" stay in the value, and the name is decoded too
+    testing.assertEqual(
+        _parse_query_params("q=a%26b%3Dc&first%20name=x&flag"),
+        {"q": ["a&b=c"], "first name": ["x"], "flag": [""]})
+
+
+def _test_query_params_repeated_name():
+    # "%66ields" decodes to "fields", so it is a third value of fields
+    testing.assertEqual(
+        _parse_query_params("fields=a&q=x&fields=b&%66ields=c"),
+        {"fields": ["a", "b", "c"], "q": ["x"]})
 
 
 def _is_param_segment(segment: str) -> bool:
@@ -185,27 +196,29 @@ def _apply_middleware(
 
 class Context(object):
     """Per-request context passed through middleware and handlers."""
-    def __init__(self, request: http.Request, path: str, raw_path: str, params: dict[str, str]):
+    def __init__(self, request: http.Request, path: str, raw_path: str, params: dict[str, str], query_params: dict[str, list[str]]):
         self.request = request
         self.path = path
         self.raw_path = raw_path
         self.params = params
-        self._query_params = None
+        self._query_params = query_params
         self._values = {}
 
     def param(self, key: str, default: str = "") -> str:
         return self.params.get_def(key, default)
 
     def query_param(self, key: str, default: str = "") -> str:
-        return self.query().get_def(key, default)
+        """The first value of query parameter key, or default if the request
+        has none."""
+        values = self._query_params.get(key)
+        if values is not None:
+            return values[0]
+        return default
 
-    def query(self) -> dict[str, str]:
-        cached = self._query_params
-        if cached is not None:
-            return cached
-        parsed = _parse_query_params(self.raw_path)
-        self._query_params = parsed
-        return parsed
+    def query(self) -> dict[str, list[str]]:
+        """The values of each query parameter by name, percent-decoded, in
+        request order."""
+        return self._query_params
 
     def set(self, key: str, value: ?value):
         self._values[key] = value
@@ -390,9 +403,13 @@ class Router(RouteRegistrar):
         req_method = request.method
         method = req_method.upper().strip() if isinstance(req_method, str) else ""
 
+        path, remainder = uri.parse_path(request_path)
+        query, _ = uri.parse_query(remainder)
         normalized_path = ""
+        query_params = {}
         try:
-            normalized_path = _normalize_path(request_path)
+            normalized_path = _normalize_path(path if path is not None else "")
+            query_params = _parse_query_params(query)
         except ValueError:
             respond(400, {}, "")
             return
@@ -401,12 +418,12 @@ class Router(RouteRegistrar):
         matched = self._select_route(method, path_segments)
 
         if matched is not None:
-            ctx = Context(request, normalized_path, request_path, matched.params)
+            ctx = Context(request, normalized_path, request_path, matched.params, query_params)
             wrapped = _apply_middleware(matched.route.handler, self.middlewares + matched.route.middlewares)
             self._dispatch(wrapped, ctx, respond)
             return
 
-        ctx = Context(request, normalized_path, request_path, {})
+        ctx = Context(request, normalized_path, request_path, {}, query_params)
         wrapped_fallback = _apply_middleware(self.not_found_handler, self.middlewares)
         self._dispatch(wrapped_fallback, ctx, respond)
 
@@ -418,8 +435,7 @@ def recoverer_middleware(log: ?logging.Logger = None) -> proc(proc(Context, proc
             try:
                 next_handler(ctx, respond)
             except Exception as e:
-                if log is not None:
-                    log.error("handler raised exception", {"method": ctx.request.method, "path": ctx.path, "error": str(e)})
+                log?.error("handler raised exception", {"method": ctx.request.method, "path": ctx.path, "error": str(e)})
                 respond(500, {}, "Internal server error")
         return wrapped
     return middleware
