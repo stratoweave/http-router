@@ -15,12 +15,12 @@ import logging
 import net
 
 
-def health(ctx: http_router.Context, respond: proc(int, dict[str, str], str) -> None):
-    respond(200, {"Content-Type": "text/plain"}, "ok")
+def health(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+    respond(200, {"Content-Type": "text/plain"}, b"ok")
 
 
-def item(ctx: http_router.Context, respond: proc(int, dict[str, str], str) -> None):
-    respond(200, {"Content-Type": "text/plain"}, "item:{ctx.param("id")}")
+def item(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+    respond(200, {"Content-Type": "text/plain"}, "item:{ctx.param("id")}".encode())
 
 
 actor main(env):
@@ -195,7 +195,7 @@ Example:
 
 ```acton
 def inject_device(next_handler):
-    def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], str) -> None):
+    def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
         ctx.set("device_name", "edge-1")
         next_handler(ctx, respond)
     return wrapped
@@ -211,8 +211,8 @@ def inject_device(next_handler):
 You can replace the default `404` behavior:
 
 ```acton
-def custom_not_found(ctx: http_router.Context, respond: proc(int, dict[str, str], str) -> None):
-    respond(404, {"Content-Type": "text/plain"}, "missing:{ctx.path}")
+def custom_not_found(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+    respond(404, {"Content-Type": "text/plain"}, "missing:{ctx.path}".encode())
 
 
 r.not_found(custom_not_found)
