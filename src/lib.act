@@ -1,8 +1,8 @@
-import http
+import std.http
 import logging
 import testing
 import time
-import uri
+import std.uri
 
 
 def _normalize_path(path: str) -> str:
@@ -53,8 +53,8 @@ def _parse_query_params(query: ?str) -> dict[str, list[str]]:
         if param == "":
             continue
         kv = param.split("=", 1)
-        name = uri.unquote(kv[0])
-        value = uri.unquote(kv[1]) if len(kv) == 2 else ""
+        name = std.uri.unquote(kv[0])
+        value = std.uri.unquote(kv[1]) if len(kv) == 2 else ""
         if name not in query_params:
             query_params[name] = []
         query_params[name].append(value)
@@ -196,7 +196,7 @@ def _apply_middleware(
 
 class Context(object):
     """Per-request context passed through middleware and handlers."""
-    def __init__(self, request: http.Request, path: str, raw_path: str, params: dict[str, str], query_params: dict[str, list[str]]):
+    def __init__(self, request: std.http.Request, path: str, raw_path: str, params: dict[str, str], query_params: dict[str, list[str]]):
         self.request = request
         self.path = path
         self.raw_path = raw_path
@@ -398,13 +398,13 @@ class Router(RouteRegistrar):
         except Exception:
             respond(500, {}, b"")
 
-    def serve(self, request: http.Request, respond: proc(int, dict[str, str], bytes) -> None):
+    def serve(self, request: std.http.Request, respond: proc(int, dict[str, str], bytes) -> None):
         request_path = request.path
         req_method = request.method
         method = req_method.upper().strip() if isinstance(req_method, str) else ""
 
-        path, remainder = uri.parse_path(request_path)
-        query, _ = uri.parse_query(remainder)
+        path, remainder = std.uri.parse_path(request_path)
+        query, _ = std.uri.parse_query(remainder)
         normalized_path = ""
         query_params = {}
         try:

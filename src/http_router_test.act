@@ -1,4 +1,4 @@
-import http
+import std.http
 import lib as http_router
 import logging
 import testing
@@ -20,8 +20,8 @@ class _ResponseCapture(object):
             on_done(self)
 
 
-def _request(method: str, path: str, headers: dict[str, str] = {}, body: bytes = b"") -> http.Request:
-    return http.Request(method, path, b"1.1", headers, body)
+def _request(method: str, path: str, headers: dict[str, str] = {}, body: bytes = b"") -> std.http.Request:
+    return std.http.Request(method, path, b"1.1", headers, body)
 
 
 def _ok_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
