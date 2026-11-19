@@ -59,31 +59,30 @@ def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_bod
 
 
 actor _test_route_precedence_and_params(t: testing.EnvT):
-    r = http_router.Router()
-
-    def static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, b"static")
-
-    def param_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, "param:{ctx.param("id")}".encode())
-
-    def wildcard_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, "wild:{ctx.param("tail")}".encode())
-
-    def after_static():
-        _serve_and_assert(t, r, _request("GET", "/items/123?x=1"), 200, b"param:123", after_param)
-
-    def after_param():
-        _serve_and_assert(t, r, _request("GET", "/items/a/b/c"), 200, b"wild:a/b/c")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/items/special"), 200, b"static", after_static)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, b"static")
+
+        def param_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, "param:{ctx.param("id")}".encode())
+
+        def wildcard_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, "wild:{ctx.param("tail")}".encode())
+
         r.get("/items/{{id}}", param_handler)
         r.get("/items/special", static_handler)
         r.get("/items/*tail", wildcard_handler)
 
+        def after_static():
+            _serve_and_assert(t, r, _request("GET", "/items/123?x=1"), 200, b"param:123", after_param)
+
+        def after_param():
+            _serve_and_assert(t, r, _request("GET", "/items/a/b/c"), 200, b"wild:a/b/c")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/items/special"), 200, b"static", after_static)
         except Exception as e:
             t.failure(e)
 
@@ -91,29 +90,28 @@ actor _test_route_precedence_and_params(t: testing.EnvT):
 
 
 actor _test_backtracks_when_static_path_has_wrong_method(t: testing.EnvT):
-    r = http_router.Router()
-
-    def post_static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(201, {"Content-Type": "text/plain"}, b"created")
-
-    def param_get_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, "param:{ctx.param("id")}".encode())
-
-    def wildcard_get_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, "wild:{ctx.param("tail")}".encode())
-
-    def after_param():
-        _serve_and_assert(t, r, _request("GET", "/files/readme"), 200, b"wild:readme")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/items/special"), 200, b"param:special", after_param)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def post_static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(201, {"Content-Type": "text/plain"}, b"created")
+
+        def param_get_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, "param:{ctx.param("id")}".encode())
+
+        def wildcard_get_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, "wild:{ctx.param("tail")}".encode())
+
         r.post("/items/special", post_static_handler)
         r.get("/items/{{id}}", param_get_handler)
         r.get("/files/*tail", wildcard_get_handler)
         r.post("/files/readme", post_static_handler)
 
+        def after_param():
+            _serve_and_assert(t, r, _request("GET", "/files/readme"), 200, b"wild:readme")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/items/special"), 200, b"param:special", after_param)
         except Exception as e:
             t.failure(e)
 
@@ -121,17 +119,16 @@ actor _test_backtracks_when_static_path_has_wrong_method(t: testing.EnvT):
 
 
 actor _test_query_param_helper(t: testing.EnvT):
-    r = http_router.Router()
-
-    def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, "{ctx.query_param("q", "<missing>")}|{ctx.query_param("empty", "<missing>")}|{ctx.query_param("missing", "<missing>")}".encode())
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/search?q=abc&empty"), 200, b"abc||<missing>")
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, "{ctx.query_param("q", "<missing>")}|{ctx.query_param("empty", "<missing>")}|{ctx.query_param("missing", "<missing>")}".encode())
+
         r.get("/search", query_handler)
 
+        try:
+            _serve_and_assert(t, r, _request("GET", "/search?q=abc&empty"), 200, b"abc||<missing>")
         except Exception as e:
             t.failure(e)
 
@@ -139,21 +136,20 @@ actor _test_query_param_helper(t: testing.EnvT):
 
 
 actor _test_query_param_percent_decoding(t: testing.EnvT):
-    r = http_router.Router()
-
-    def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(200, {"Content-Type": "text/plain"}, ctx.query_param("q", "<missing>").encode())
-
-    def bad_escape():
-        # ValueError: Invalid percent escape: %z
-        _serve_and_assert(t, r, _request("GET", "/search?q=%zz"), 400, b"")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/search?q=a%2Fb"), 200, b"a/b", bad_escape)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(200, {"Content-Type": "text/plain"}, ctx.query_param("q", "<missing>").encode())
+
         r.get("/search", query_handler)
 
+        def bad_escape():
+            # ValueError: Invalid percent escape: %z
+            _serve_and_assert(t, r, _request("GET", "/search?q=%zz"), 400, b"")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/search?q=a%2Fb"), 200, b"a/b", bad_escape)
         except Exception as e:
             t.failure(e)
 
@@ -161,38 +157,37 @@ actor _test_query_param_percent_decoding(t: testing.EnvT):
 
 
 actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
-    r = http_router.Router()
-
-    def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
-        def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-            route_id = ctx.param("id")
-            ctx.set("device_name", "edge-1")
-            ctx.set("device_index", 7)
-            ctx.set("route_id_seen_by_middleware", route_id)
-            next_handler(ctx, respond)
-        return wrapped
-
-    def handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        device_name = ctx.get("device_name")
-        device_index = ctx.get("device_index")
-        route_id_seen_by_middleware = ctx.get("route_id_seen_by_middleware")
-        route_id = ctx.param("id")
-        missing = ctx.get("missing")
-        if isinstance(device_name, str) and isinstance(device_index, int) and isinstance(route_id_seen_by_middleware, str) and route_id != "" and missing is None:
-            respond(200, {"Content-Type": "text/plain"}, "{device_name}:{device_index}:{route_id_seen_by_middleware}:{route_id}".encode())
-            return
-        respond(500, {"Content-Type": "text/plain"}, b"missing")
-
-    def install(g: http_router.RouteGroup):
-        g.use(inject_values)
-        g.get("/ctx/{{id}}", handler)
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/api/ctx/42"), 200, b"edge-1:7:42:42")
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
+            def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+                route_id = ctx.param("id")
+                ctx.set("device_name", "edge-1")
+                ctx.set("device_index", 7)
+                ctx.set("route_id_seen_by_middleware", route_id)
+                next_handler(ctx, respond)
+            return wrapped
+
+        def handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            device_name = ctx.get("device_name")
+            device_index = ctx.get("device_index")
+            route_id_seen_by_middleware = ctx.get("route_id_seen_by_middleware")
+            route_id = ctx.param("id")
+            missing = ctx.get("missing")
+            if isinstance(device_name, str) and isinstance(device_index, int) and isinstance(route_id_seen_by_middleware, str) and route_id != "" and missing is None:
+                respond(200, {"Content-Type": "text/plain"}, "{device_name}:{device_index}:{route_id_seen_by_middleware}:{route_id}".encode())
+                return
+            respond(500, {"Content-Type": "text/plain"}, b"missing")
+
+        def install(g: http_router.RouteGroup):
+            g.use(inject_values)
+            g.get("/ctx/{{id}}", handler)
+
         r.route("/api", install)
 
+        try:
+            _serve_and_assert(t, r, _request("GET", "/api/ctx/42"), 200, b"edge-1:7:42:42")
         except Exception as e:
             t.failure(e)
 
@@ -200,17 +195,16 @@ actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
 
 
 actor _test_not_found_on_method_mismatch(t: testing.EnvT):
-    r = http_router.Router()
-    def after_wrong_method():
-        _serve_and_assert(t, r, _request("GET", "/does-not-exist"), 404, b"")
-
-    try:
-        _serve_and_assert(t, r, _request("PATCH", "/api/ping"), 404, b"", after_wrong_method)
-
     proc def __startup__():
+        r = http_router.Router()
         r.get("/api/ping", _ok_handler)
         r.post("/api/ping", _ok_handler)
 
+        def after_wrong_method():
+            _serve_and_assert(t, r, _request("GET", "/does-not-exist"), 404, b"")
+
+        try:
+            _serve_and_assert(t, r, _request("PATCH", "/api/ping"), 404, b"", after_wrong_method)
         except Exception as e:
             t.failure(e)
 
@@ -218,23 +212,22 @@ actor _test_not_found_on_method_mismatch(t: testing.EnvT):
 
 
 actor _test_route_groups_join_prefixes(t: testing.EnvT):
-    r = http_router.Router()
-
-    def build_v1(g: http_router.RouteGroup):
-        g.get("/info", _ok_handler)
-
-    def build_api(g: http_router.RouteGroup):
-        g.route("/v1", build_v1)
-
-    def after_hit():
-        _serve_and_assert(t, r, _request("GET", "/info"), 404, b"")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/api/v1/info"), 200, b"ok", after_hit)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def build_v1(g: http_router.RouteGroup):
+            g.get("/info", _ok_handler)
+
+        def build_api(g: http_router.RouteGroup):
+            g.route("/v1", build_v1)
+
         r.route("/api", build_api)
 
+        def after_hit():
+            _serve_and_assert(t, r, _request("GET", "/info"), 404, b"")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/api/v1/info"), 200, b"ok", after_hit)
         except Exception as e:
             t.failure(e)
 
@@ -242,21 +235,20 @@ actor _test_route_groups_join_prefixes(t: testing.EnvT):
 
 
 actor _test_route_bundle_installs_on_root_and_nested_prefixes(t: testing.EnvT):
-    r = http_router.Router()
-
-    def install(bundle: http_router.RouteGroup):
-        bundle.get("/ping", _ok_handler)
-
-    def after_root():
-        _serve_and_assert(t, r, _request("GET", "/api/ping"), 200, b"ok")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/ping"), 200, b"ok", after_root)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def install(bundle: http_router.RouteGroup):
+            bundle.get("/ping", _ok_handler)
+
         r.route("/", install)
         r.route("/api", install)
 
+        def after_root():
+            _serve_and_assert(t, r, _request("GET", "/api/ping"), 200, b"ok")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/ping"), 200, b"ok", after_root)
         except Exception as e:
             t.failure(e)
 
@@ -264,24 +256,23 @@ actor _test_route_bundle_installs_on_root_and_nested_prefixes(t: testing.EnvT):
 
 
 actor _test_multiple_bundles_can_share_root_prefix(t: testing.EnvT):
-    r = http_router.Router()
-
-    def install_health(g: http_router.RouteGroup):
-        g.get("/health", _ok_handler)
-
-    def install_metrics(g: http_router.RouteGroup):
-        g.get("/metrics", _ok_handler)
-
-    def after_health():
-        _serve_and_assert(t, r, _request("GET", "/metrics"), 200, b"ok")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/health"), 200, b"ok", after_health)
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def install_health(g: http_router.RouteGroup):
+            g.get("/health", _ok_handler)
+
+        def install_metrics(g: http_router.RouteGroup):
+            g.get("/metrics", _ok_handler)
+
         r.route("/", install_health)
         r.route("/", install_metrics)
 
+        def after_health():
+            _serve_and_assert(t, r, _request("GET", "/metrics"), 200, b"ok")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/health"), 200, b"ok", after_health)
         except Exception as e:
             t.failure(e)
 
@@ -289,23 +280,22 @@ actor _test_multiple_bundles_can_share_root_prefix(t: testing.EnvT):
 
 
 actor _test_scoped_middleware_applies_only_within_installed_bundle(t: testing.EnvT):
-    r = http_router.Router()
-    def install_api(g: http_router.RouteGroup):
-        g.use(_suffix_middleware(":api"))
-        g.get("/ping", _ok_handler)
-
-    def after_root():
-        _serve_and_assert(t, r, _request("GET", "/api/ping"), 200, b"ok:api:global")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/root"), 200, b"ok:global", after_root)
-
     proc def __startup__():
+        r = http_router.Router()
         r.use(_suffix_middleware(":global"))
         r.get("/root", _ok_handler)
 
+        def install_api(g: http_router.RouteGroup):
+            g.use(_suffix_middleware(":api"))
+            g.get("/ping", _ok_handler)
+
         r.route("/api", install_api)
 
+        def after_root():
+            _serve_and_assert(t, r, _request("GET", "/api/ping"), 200, b"ok:api:global")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/root"), 200, b"ok:global", after_root)
         except Exception as e:
             t.failure(e)
 
@@ -313,21 +303,20 @@ actor _test_scoped_middleware_applies_only_within_installed_bundle(t: testing.En
 
 
 actor _test_route_overlap_is_rejected(t: testing.EnvT):
-    r = http_router.Router()
-
-    try:
-        r.get("/items/{{id}}", _ok_handler)
-
-        raised = 0
-        try:
-            r.get("/items/{{slug}}", _ok_handler)
-        except ValueError:
-            raised = 1
-
-        testing.assertEqual(raised, 1)
-        _serve_and_assert(t, r, _request("GET", "/items/abc"), 200, b"ok")
-
     proc def __startup__():
+        r = http_router.Router()
+
+        try:
+            r.get("/items/{{id}}", _ok_handler)
+
+            raised = 0
+            try:
+                r.get("/items/{{slug}}", _ok_handler)
+            except ValueError:
+                raised = 1
+
+            testing.assertEqual(raised, 1)
+            _serve_and_assert(t, r, _request("GET", "/items/abc"), 200, b"ok")
         except Exception as e:
             t.failure(e)
 
@@ -335,17 +324,16 @@ actor _test_route_overlap_is_rejected(t: testing.EnvT):
 
 
 actor _test_custom_not_found_handler(t: testing.EnvT):
-    r = http_router.Router()
-
-    def custom_not_found(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        respond(404, {"Content-Type": "text/plain"}, "missing:{ctx.path}".encode())
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/missing"), 404, b"missing:/missing")
-
     proc def __startup__():
+        r = http_router.Router()
+
+        def custom_not_found(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            respond(404, {"Content-Type": "text/plain"}, "missing:{ctx.path}".encode())
+
         r.not_found(custom_not_found)
 
+        try:
+            _serve_and_assert(t, r, _request("GET", "/missing"), 404, b"missing:/missing")
         except Exception as e:
             t.failure(e)
 
@@ -353,19 +341,18 @@ actor _test_custom_not_found_handler(t: testing.EnvT):
 
 
 actor _test_access_log_middleware(t: testing.EnvT):
-    var r = http_router.Router()
-    log = logging.Logger(t.log_handler)
-    def logged_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
-        after 0.1: respond(201, {"Content-Type": "text/plain"}, b"logged")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/access-log"), 201, b"logged")
-
     proc def __startup__():
+        r = http_router.Router()
+        log = logging.Logger(t.log_handler)
         r.use(http_router.access_log_middleware(log))
+
+        def logged_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
+            after 0.1: respond(201, {"Content-Type": "text/plain"}, b"logged")
 
         r.get("/access-log", logged_handler)
 
+        try:
+            _serve_and_assert(t, r, _request("GET", "/access-log"), 201, b"logged")
         except Exception as e:
             t.failure(e)
 
@@ -373,21 +360,20 @@ actor _test_access_log_middleware(t: testing.EnvT):
 
 
 actor _test_recoverer_middleware(t: testing.EnvT):
-    r = http_router.Router()
-    def boom_handler(ctx, respond):
-        raise ValueError("boom")
-
-    def after_boom():
-        _serve_and_assert(t, r, _request("GET", "/bad\\path"), 400, b"")
-
-    try:
-        _serve_and_assert(t, r, _request("GET", "/boom"), 500, b"Internal server error", after_boom)
-
     proc def __startup__():
+        r = http_router.Router()
         r.use(http_router.recoverer_middleware())
+
+        def boom_handler(ctx, respond):
+            raise ValueError("boom")
 
         r.get("/boom", boom_handler)
 
+        def after_boom():
+            _serve_and_assert(t, r, _request("GET", "/bad\\path"), 400, b"")
+
+        try:
+            _serve_and_assert(t, r, _request("GET", "/boom"), 500, b"Internal server error", after_boom)
         except Exception as e:
             t.failure(e)
 
