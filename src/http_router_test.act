@@ -28,8 +28,8 @@ def _ok_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], byt
     respond(200, {"Content-Type": "text/plain"}, b"ok")
 
 
-def _suffix_middleware(suffix: str) -> proc(proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None) -> proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None:
-    def middleware(downstream_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
+pure def _suffix_middleware(suffix: str) -> (proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None) -> proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None:
+    pure def middleware(downstream_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
         def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
             def wrapped_respond(status: int, headers: dict[str, str], body: bytes):
                 respond(status, headers, body + suffix.encode())
@@ -39,7 +39,7 @@ def _suffix_middleware(suffix: str) -> proc(proc(http_router.Context, proc(int, 
     return middleware
 
 
-def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_body, next=None):
+def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_body, next: ?proc() -> None=None):
     def done(res: _ResponseCapture):
         try:
             testing.assertEqual(res.status, expected_status)
@@ -156,7 +156,7 @@ actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
     proc def __startup__():
         r = http_router.Router()
 
-        def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
+        pure def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
             def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
                 route_id = ctx.param("id")
                 ctx.set("device_name", "edge-1")
