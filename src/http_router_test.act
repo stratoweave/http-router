@@ -28,8 +28,8 @@ def _ok_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], byt
     respond(200, {"Content-Type": "text/plain"}, b"ok")
 
 
-def _suffix_middleware(suffix: str) -> proc(proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None) -> proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None:
-    def middleware(downstream_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
+pure def _suffix_middleware(suffix: str) -> (proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None) -> proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None:
+    pure def middleware(downstream_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
         def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
             def wrapped_respond(status: int, headers: dict[str, str], body: bytes):
                 respond(status, headers, body + suffix.encode())
@@ -39,7 +39,7 @@ def _suffix_middleware(suffix: str) -> proc(proc(http_router.Context, proc(int, 
     return middleware
 
 
-def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_body, next=None):
+def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_body, next: ?proc() -> None=None):
     def done(res: _ResponseCapture):
         try:
             testing.assertEqual(res.status, expected_status)
@@ -59,7 +59,7 @@ def _serve_and_assert(t: testing.EnvT, r, request, expected_status, expected_bod
 
 
 actor _test_route_precedence_and_params(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
@@ -89,7 +89,7 @@ actor _test_route_precedence_and_params(t: testing.EnvT):
 
 
 actor _test_backtracks_when_static_path_has_wrong_method(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def post_static_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
@@ -117,7 +117,7 @@ actor _test_backtracks_when_static_path_has_wrong_method(t: testing.EnvT):
 
 
 actor _test_query_param_helper(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
@@ -133,7 +133,7 @@ actor _test_query_param_helper(t: testing.EnvT):
 
 
 actor _test_query_param_percent_decoding(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def query_handler(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
@@ -153,10 +153,10 @@ actor _test_query_param_percent_decoding(t: testing.EnvT):
 
 
 actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
-        def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
+        pure def inject_values(next_handler: proc(http_router.Context, proc(int, dict[str, str], bytes) -> None) -> None):
             def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
                 route_id = ctx.param("id")
                 ctx.set("device_name", "edge-1")
@@ -190,7 +190,7 @@ actor _test_context_values_can_be_set_in_middleware(t: testing.EnvT):
 
 
 actor _test_not_found_on_method_mismatch(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
         r.get("/api/ping", _ok_handler)
         r.post("/api/ping", _ok_handler)
@@ -206,7 +206,7 @@ actor _test_not_found_on_method_mismatch(t: testing.EnvT):
 
 
 actor _test_route_groups_join_prefixes(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def build_v1(g: http_router.RouteGroup):
@@ -228,7 +228,7 @@ actor _test_route_groups_join_prefixes(t: testing.EnvT):
 
 
 actor _test_route_bundle_installs_on_root_and_nested_prefixes(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def install(bundle: http_router.RouteGroup):
@@ -248,7 +248,7 @@ actor _test_route_bundle_installs_on_root_and_nested_prefixes(t: testing.EnvT):
 
 
 actor _test_multiple_bundles_can_share_root_prefix(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def install_health(g: http_router.RouteGroup):
@@ -271,7 +271,7 @@ actor _test_multiple_bundles_can_share_root_prefix(t: testing.EnvT):
 
 
 actor _test_scoped_middleware_applies_only_within_installed_bundle(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
         r.use(_suffix_middleware(":global"))
         r.get("/root", _ok_handler)
@@ -293,7 +293,7 @@ actor _test_scoped_middleware_applies_only_within_installed_bundle(t: testing.En
 
 
 actor _test_route_overlap_is_rejected(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         try:
@@ -313,7 +313,7 @@ actor _test_route_overlap_is_rejected(t: testing.EnvT):
 
 
 actor _test_custom_not_found_handler(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
 
         def custom_not_found(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
@@ -329,7 +329,7 @@ actor _test_custom_not_found_handler(t: testing.EnvT):
 
 
 actor _test_access_log_middleware(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
         log = logging.Logger(t.log_handler)
         r.use(http_router.access_log_middleware(log))
@@ -347,7 +347,7 @@ actor _test_access_log_middleware(t: testing.EnvT):
 
 
 actor _test_recoverer_middleware(t: testing.EnvT):
-    proc def __startup__():
+    def __startup__():
         r = http_router.Router()
         r.use(http_router.recoverer_middleware())
 

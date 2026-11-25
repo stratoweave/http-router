@@ -194,7 +194,7 @@ Useful helpers:
 Example:
 
 ```acton
-def inject_device(next_handler):
+pure def inject_device(next_handler):
     def wrapped(ctx: http_router.Context, respond: proc(int, dict[str, str], bytes) -> None):
         ctx.set("device_name", "edge-1")
         next_handler(ctx, respond)
